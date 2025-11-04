@@ -11,20 +11,30 @@ import java.util.*;
 public class EarCuttingTriangulator implements Triangulator {
     @Override
     public Model triangulateModel(Model model) {
-        return null;
+        ArrayList<Polygon> newPolygons = new ArrayList<>(model.vertices.size() - 2);
+        for (Polygon polygon : model.polygons) {
+            List<Polygon> clipped = triangulatePolygon(model, polygon);
+            newPolygons.addAll(clipped);
+        }
+        model.polygons = newPolygons;
+        return model;
     }
 
     @Override
     public TriangulatedModel createTriangulatedModel(Model model) {
-        return null;
+        TriangulatedModel triangulatedModel = new TriangulatedModel();
+        triangulatedModel.vertices = new ArrayList<>(model.vertices);
+        triangulatedModel.normals = new ArrayList<>(model.normals);
+        triangulatedModel.textureVertices = new ArrayList<>(model.textureVertices);
+        triangulatedModel.polygons = new ArrayList<>(model.polygons);
+        triangulateModel(triangulatedModel);
+        return triangulatedModel;
     }
 
     @Override
     public List<Polygon> triangulatePolygon(Model model, Polygon polygon) {
-        // todo: сортировать по окружности точки полигона
         if (polygon.getVertexIndices().size() < 4) return new ArrayList<>(List.of(polygon));
 
-//        ArrayList<Integer> verticesIndexes = polygon.getVertexIndices();
         Queue<Integer> verticesIndexes = new LinkedList<>(polygon.getVertexIndices());
         Map<Integer, Vector3f> vertices = new HashMap<>();
         for (Integer verticesIndex : verticesIndexes) {

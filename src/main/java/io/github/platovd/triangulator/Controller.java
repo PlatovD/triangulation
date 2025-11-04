@@ -7,23 +7,34 @@ import io.github.platovd.triangulator.tools.EarCuttingTriangulator;
 import io.github.platovd.triangulator.tools.SimpleTriangulator;
 import io.github.platovd.triangulator.tools.Triangulator;
 import io.github.platovd.triangulator.util.Constants;
+import io.github.platovd.triangulator.util.TriangulationType;
 import javafx.fxml.FXML;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.Button;
+import javafx.scene.control.ChoiceBox;
 import javafx.scene.input.MouseEvent;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 public class Controller {
-    List<Vector3f> pointsOfPolygon = new ArrayList<>();
+    private final List<Vector3f> pointsOfPolygon = new ArrayList<>();
+    private final Map<TriangulationType, Triangulator> triangulators = Map.of(
+            TriangulationType.SIMPLE, new SimpleTriangulator(),
+            TriangulationType.EAR_CUTTING, new EarCuttingTriangulator()
+    );
+    private Triangulator currentTriangulator;
 
     @FXML
     private Canvas canvas;
 
     @FXML
     private Button clearButton;
+
+    @FXML
+    private ChoiceBox<TriangulationType> triangulationTypeChoiceBox;
 
     @FXML
     private Button triangulateButton;
@@ -36,6 +47,12 @@ public class Controller {
         });
         triangulateButton.setOnAction(event -> {
             triangulationListener();
+        });
+        triangulationTypeChoiceBox.getItems().addAll(TriangulationType.SIMPLE, TriangulationType.EAR_CUTTING);
+        triangulationTypeChoiceBox.setValue(TriangulationType.EAR_CUTTING);
+        currentTriangulator = triangulators.get(triangulationTypeChoiceBox.getValue());
+        triangulationTypeChoiceBox.setOnAction(e -> {
+            currentTriangulator = triangulators.get(triangulationTypeChoiceBox.getValue());
         });
     }
 
@@ -86,8 +103,7 @@ public class Controller {
             indexes.add(i);
         }
         model.polygons.add(new Polygon(indexes));
-        Triangulator triangulator = new EarCuttingTriangulator();
-        List<Polygon> polygons = triangulator.triangulatePolygon(model, model.polygons.get(0));
+        List<Polygon> polygons = currentTriangulator.triangulatePolygon(model, model.polygons.get(0));
         drawPolygons(model, polygons);
     }
 
