@@ -23,12 +23,12 @@ public class Polygon {
         this.normalIndices = normalIndices;
     }
 
-    public void setVertexIndices(ArrayList<Integer> vertexIndices) {
+    public void setVertexIndices(List<Integer> vertexIndices) {
         assert vertexIndices.size() >= 3;
         this.vertexIndices = vertexIndices;
     }
 
-    public void setTextureVertexIndices(ArrayList<Integer> textureVertexIndices) {
+    public void setTextureVertexIndices(List<Integer> textureVertexIndices) {
         assert textureVertexIndices.size() >= 3;
         this.textureVertexIndices = textureVertexIndices;
     }

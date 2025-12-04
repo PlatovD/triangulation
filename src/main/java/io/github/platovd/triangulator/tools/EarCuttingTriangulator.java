@@ -4,37 +4,15 @@ import io.github.platovd.triangulator.math.Vector3f;
 import io.github.platovd.triangulator.model.Model;
 import io.github.platovd.triangulator.model.Polygon;
 import io.github.platovd.triangulator.model.Triangle;
-import io.github.platovd.triangulator.model.TriangulatedModel;
 import io.github.platovd.triangulator.util.ByPassDirection;
+import io.github.platovd.triangulator.util.PolygonUtils;
 
 import java.util.*;
 
 public class EarCuttingTriangulator implements Triangulator {
     @Override
-    public Model triangulateModel(Model model) {
-        ArrayList<Polygon> newPolygons = new ArrayList<>(model.vertices.size() - 2);
-        for (Polygon polygon : model.polygons) {
-            List<Polygon> clipped = triangulatePolygon(model, polygon);
-            newPolygons.addAll(clipped);
-        }
-        model.polygons = newPolygons;
-        return model;
-    }
-
-    @Override
-    public TriangulatedModel createTriangulatedModel(Model model) {
-        TriangulatedModel triangulatedModel = new TriangulatedModel();
-        triangulatedModel.vertices = new ArrayList<>(model.vertices);
-        triangulatedModel.normals = new ArrayList<>(model.normals);
-        triangulatedModel.textureVertices = new ArrayList<>(model.textureVertices);
-        triangulatedModel.polygons = new ArrayList<>(model.polygons);
-        triangulateModel(triangulatedModel);
-        return triangulatedModel;
-    }
-
-    @Override
     public List<Polygon> triangulatePolygon(Model model, Polygon polygon) {
-        // случай, когда 3 и менее вершины изначально. Возвращаю глубокую копию полигона
+        // когда 3 и менее вершины изначально. Возвращаю deep копию полигона
         if (polygon.getVertexIndices().size() < 4) {
             List<Integer> verticesIndexes = new ArrayList<>(polygon.getVertexIndices());
             List<Integer> normalIndexes = new ArrayList<>(polygon.getNormalIndices());
@@ -44,11 +22,21 @@ public class EarCuttingTriangulator implements Triangulator {
 
         // получаю данные из оригинального объекта
         Queue<Integer> verticesIndexes = new LinkedList<>(polygon.getVertexIndices());
-        Map<Integer, Vector3f> vertices = new TreeMap<>();
+        // создаю ассоциативные коллекции, которые связывают индексы, используемые в полигонах с объектами меша
+        Map<Integer, Vector3f> vertices = new HashMap<>();
+        Map<Integer, Integer> textureIndexesMap = new HashMap<>();
+        Map<Integer, Integer> normalsIndexesMap = new HashMap<>();
+        // вспомогательный список вершин, хранимый для определения направления задания полигона
         List<Vector3f> verticesList = new ArrayList<>();
-        for (Integer verticesIndex : verticesIndexes) {
-            vertices.put(verticesIndex, model.vertices.get(verticesIndex));
-            verticesList.add(model.vertices.get(verticesIndex));
+        int indexOfVertexInPolygon = 0;
+        for (Integer vertexIndex : verticesIndexes) {
+            vertices.put(vertexIndex, model.vertices.get(vertexIndex));
+            if (vertexIndex < polygon.getTextureVertexIndices().size())
+                textureIndexesMap.put(vertexIndex, polygon.getTextureVertexIndices().get(indexOfVertexInPolygon));
+            if (vertexIndex < polygon.getNormalIndices().size())
+                normalsIndexesMap.put(vertexIndex, polygon.getNormalIndices().get(indexOfVertexInPolygon));
+            verticesList.add(model.vertices.get(vertexIndex));
+            indexOfVertexInPolygon++;
         }
 
         // начинаю обработку вершин и создание новых полигонов
@@ -77,7 +65,11 @@ public class EarCuttingTriangulator implements Triangulator {
                 rightPointIndex = verticesIndexes.poll();
                 continue;
             }
-            newPolygons.add(new Polygon(List.of(leftPointIndex, middlePointIndex, rightPointIndex)));
+            newPolygons.add(PolygonUtils.createNewPolygon(
+                    List.of(leftPointIndex, middlePointIndex, rightPointIndex),
+                    textureIndexesMap,
+                    normalsIndexesMap
+            ));
             middlePointIndex = rightPointIndex;
             rightPointIndex = verticesIndexes.poll();
         }
@@ -85,6 +77,14 @@ public class EarCuttingTriangulator implements Triangulator {
         return newPolygons;
     }
 
+    /**
+     * Проверяет список точек на принадлежность треугольнику
+     * @param leftPointIndex первая вершина треугольника
+     * @param rightPointIndex вторая вершина треугольника
+     * @param middlePointIndex третья вершина треугольника
+     * @param vertices список вершин на проверку
+     * @return true, если одна из вершин в треугольнике, иначе false
+     */
     protected boolean isVerticesInsideTriangle(int leftPointIndex, int rightPointIndex, int middlePointIndex, Map<Integer, Vector3f> vertices) {
         Triangle triangle =
                 new Triangle(vertices.get(leftPointIndex), vertices.get(rightPointIndex), vertices.get(middlePointIndex));
