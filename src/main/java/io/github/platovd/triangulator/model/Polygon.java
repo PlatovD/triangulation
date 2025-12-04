@@ -5,9 +5,9 @@ import java.util.List;
 
 public class Polygon {
 
-    private ArrayList<Integer> vertexIndices = new ArrayList<>();
-    private ArrayList<Integer> textureVertexIndices = new ArrayList<>();
-    private ArrayList<Integer> normalIndices = new ArrayList<>();
+    private List<Integer> vertexIndices = new ArrayList<>();
+    private List<Integer> textureVertexIndices = new ArrayList<>();
+    private List<Integer> normalIndices = new ArrayList<>();
 
     public Polygon() {
 
@@ -17,6 +17,11 @@ public class Polygon {
         vertexIndices = new ArrayList<>(indexes);
     }
 
+    public Polygon(List<Integer> vertexIndices, List<Integer> textureVertexIndices, List<Integer> normalIndices) {
+        this.vertexIndices = vertexIndices;
+        this.textureVertexIndices = textureVertexIndices;
+        this.normalIndices = normalIndices;
+    }
 
     public void setVertexIndices(ArrayList<Integer> vertexIndices) {
         assert vertexIndices.size() >= 3;
@@ -28,7 +33,7 @@ public class Polygon {
         this.textureVertexIndices = textureVertexIndices;
     }
 
-    public void setNormalIndices(ArrayList<Integer> normalIndices) {
+    public void setNormalIndices(List<Integer> normalIndices) {
         assert normalIndices.size() >= 3;
         this.normalIndices = normalIndices;
     }
@@ -37,11 +42,11 @@ public class Polygon {
         return new ArrayList<>(vertexIndices);
     }
 
-    public ArrayList<Integer> getTextureVertexIndices() {
+    public List<Integer> getTextureVertexIndices() {
         return textureVertexIndices;
     }
 
-    public ArrayList<Integer> getNormalIndices() {
+    public List<Integer> getNormalIndices() {
         return normalIndices;
     }
 }
