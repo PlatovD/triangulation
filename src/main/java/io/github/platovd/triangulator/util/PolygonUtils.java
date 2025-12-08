@@ -23,4 +23,11 @@ public class PolygonUtils {
         polygon.setNormalIndices(normalsIndices);
         return polygon;
     }
+
+    public static Polygon deepCopyOfPolygon(Polygon polygon) {
+        List<Integer> verticesIndexes = new ArrayList<>(polygon.getVertexIndices());
+        List<Integer> normalIndexes = new ArrayList<>(polygon.getNormalIndices());
+        List<Integer> textureVerticesIndexes = new ArrayList<>(polygon.getTextureVertexIndices());
+        return new Polygon(verticesIndexes, textureVerticesIndexes, normalIndexes);
+    }
 }

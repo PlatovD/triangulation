@@ -8,4 +8,5 @@ public class Constants {
     public static int POINT_RADIUS = 5;
     public static Color POINT_COLOR = Color.RED;
     public static Color LINE_COLOR = Color.BLACK;
+    public static Float EPS = 1e-5F;
 }

@@ -5,19 +5,21 @@ import io.github.platovd.triangulator.model.Model;
 import io.github.platovd.triangulator.model.Polygon;
 import io.github.platovd.triangulator.model.Triangle;
 import io.github.platovd.triangulator.util.ByPassDirection;
+import io.github.platovd.triangulator.util.Constants;
+import io.github.platovd.triangulator.util.Pair;
 import io.github.platovd.triangulator.util.PolygonUtils;
 
 import java.util.*;
+import java.util.function.Function;
+
+import static java.lang.Math.*;
 
 public class EarCuttingTriangulator implements Triangulator {
     @Override
     public List<Polygon> triangulatePolygon(Model model, Polygon polygon) {
         // когда 3 и менее вершины изначально. Возвращаю deep копию полигона
         if (polygon.getVertexIndices().size() < 4) {
-            List<Integer> verticesIndexes = new ArrayList<>(polygon.getVertexIndices());
-            List<Integer> normalIndexes = new ArrayList<>(polygon.getNormalIndices());
-            List<Integer> textureVerticesIndexes = new ArrayList<>(polygon.getTextureVertexIndices());
-            return List.of(new Polygon(verticesIndexes, textureVerticesIndexes, normalIndexes));
+            return List.of(PolygonUtils.deepCopyOfPolygon(polygon));
         }
 
         // получаю данные из оригинального объекта
@@ -39,7 +41,10 @@ public class EarCuttingTriangulator implements Triangulator {
             indexOfVertexInPolygon++;
         }
 
-        // начинаю обработку вершин и создание новых полигонов
+        // Подготовка. Подбираю оси, по которым буду триангулировать
+        List<Function<Vector3f, Float>> axes = chooseAxes(verticesList);
+        // если невозможно триангулировать
+        if (axes == null) return List.of(PolygonUtils.deepCopyOfPolygon(polygon));
         ByPassDirection polygonDirection = findDirection(verticesList);
         List<Polygon> newPolygons = new ArrayList<>();
         int leftPointIndex = verticesIndexes.poll();
@@ -94,6 +99,40 @@ public class EarCuttingTriangulator implements Triangulator {
             }
         }
         return false;
+    }
+
+    protected List<Function<Vector3f, Float>> chooseAxes(List<Vector3f> vertices) {
+        float minX = Float.MAX_VALUE;
+        float maxX = -Float.MAX_VALUE;
+        float minY = Float.MAX_VALUE;
+        float maxY = -Float.MAX_VALUE;
+        float minZ = Float.MAX_VALUE;
+        float maxZ = -Float.MAX_VALUE;
+
+        for (Vector3f vertex : vertices) {
+            minX = min(vertex.getX(), minX);
+            maxX = max(vertex.getX(), maxX);
+
+            minY = min(vertex.getY(), minY);
+            maxY = max(vertex.getY(), maxY);
+
+            minZ = min(vertex.getZ(), minZ);
+            maxZ = max(vertex.getZ(), maxZ);
+        }
+
+        float dx = maxX - minX;
+        float dy = maxY - minY;
+        float dz = maxZ - minZ;
+
+        if (dx < Constants.EPS && dy < Constants.EPS && dz < Constants.EPS) return null;
+
+        Pair<Float, Function<Vector3f, Float>> dxPair = new Pair<>(dx, Vector3f::getX);
+        Pair<Float, Function<Vector3f, Float>> dyPair = new Pair<>(dy, Vector3f::getY);
+        Pair<Float, Function<Vector3f, Float>> dzPair = new Pair<>(dz, Vector3f::getZ);
+
+        List<Pair<Float, Function<Vector3f, Float>>> pairs = new ArrayList<>(List.of(dxPair, dyPair, dzPair));
+        pairs.sort((t1, t2) -> Float.compare(t1.first, t2.first));
+        return List.of(pairs.get(2).second, pairs.get(1).second);
     }
 
     /**
