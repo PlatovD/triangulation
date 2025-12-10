@@ -1,5 +1,6 @@
 package io.github.platovd.triangulator.tools;
 
+import io.github.platovd.triangulator.math.MathUtil;
 import io.github.platovd.triangulator.math.Vector3f;
 import io.github.platovd.triangulator.model.Model;
 import io.github.platovd.triangulator.model.Polygon;
@@ -45,7 +46,7 @@ public class EarCuttingTriangulator implements Triangulator {
         List<Function<Vector3f, Float>> axes = chooseAxes(verticesList);
         // если невозможно триангулировать
         if (axes == null) return List.of(PolygonUtils.deepCopyOfPolygon(polygon));
-        ByPassDirection polygonDirection = findDirection(verticesList);
+        ByPassDirection polygonDirection = findDirection(verticesList, axes.get(0), axes.get(1));
         List<Polygon> newPolygons = new ArrayList<>();
         int leftPointIndex = verticesIndexes.poll();
         int middlePointIndex = verticesIndexes.poll();
@@ -55,12 +56,13 @@ public class EarCuttingTriangulator implements Triangulator {
             // 1)одна из оставшихся вершин в треугольнике
             // 2)направления обхода полигона и текущего треугольника не совпадают
             if (
-                    isVerticesInsideTriangle(leftPointIndex, middlePointIndex, rightPointIndex, vertices)
+                    isVerticesInsideTriangleByGeroneSquare(leftPointIndex, middlePointIndex, rightPointIndex, vertices,
+                            axes.get(0), axes.get(1))
                             || findDirection(
                             List.of(
                                     vertices.get(leftPointIndex),
                                     vertices.get(middlePointIndex),
-                                    vertices.get(rightPointIndex)))
+                                    vertices.get(rightPointIndex)), axes.get(0), axes.get(1))
                             != polygonDirection
 
             ) {
@@ -101,6 +103,59 @@ public class EarCuttingTriangulator implements Triangulator {
         return false;
     }
 
+    protected boolean isVerticesInsideTriangleByGeroneSquare(
+            int leftPointIndex, int rightPointIndex, int middlePointIndex, Map<Integer, Vector3f> vertices,
+            Function<Vector3f, Float> getterFirst, Function<Vector3f, Float> getterSecond
+    ) {
+        float mainS = (float) MathUtil.calcSquareByGeroneByVertices(
+                getterFirst.apply(vertices.get(leftPointIndex)),
+                getterSecond.apply(vertices.get(leftPointIndex)),
+
+                getterFirst.apply(vertices.get(middlePointIndex)),
+                getterSecond.apply(vertices.get(middlePointIndex)),
+
+                getterFirst.apply(vertices.get(rightPointIndex)),
+                getterSecond.apply(vertices.get(rightPointIndex))
+        );
+        for (int i : vertices.keySet()) {
+            if (i != leftPointIndex && i != rightPointIndex && i != middlePointIndex) {
+                float leftMidS = (float) MathUtil.calcSquareByGeroneByVertices(
+                        getterFirst.apply(vertices.get(leftPointIndex)),
+                        getterSecond.apply(vertices.get(leftPointIndex)),
+
+                        getterFirst.apply(vertices.get(middlePointIndex)),
+                        getterSecond.apply(vertices.get(middlePointIndex)),
+
+                        getterFirst.apply(vertices.get(i)),
+                        getterSecond.apply(vertices.get(i))
+                );
+                float leftRightS = (float) MathUtil.calcSquareByGeroneByVertices(
+                        getterFirst.apply(vertices.get(leftPointIndex)),
+                        getterSecond.apply(vertices.get(leftPointIndex)),
+
+                        getterFirst.apply(vertices.get(rightPointIndex)),
+                        getterSecond.apply(vertices.get(rightPointIndex)),
+
+                        getterFirst.apply(vertices.get(i)),
+                        getterSecond.apply(vertices.get(i))
+                );
+
+                float midRightS = (float) MathUtil.calcSquareByGeroneByVertices(
+                        getterFirst.apply(vertices.get(middlePointIndex)),
+                        getterSecond.apply(vertices.get(middlePointIndex)),
+
+                        getterFirst.apply(vertices.get(rightPointIndex)),
+                        getterSecond.apply(vertices.get(rightPointIndex)),
+
+                        getterFirst.apply(vertices.get(i)),
+                        getterSecond.apply(vertices.get(i))
+                );
+                if (abs(mainS - (leftMidS + midRightS + leftRightS)) < Constants.EPS) return true;
+            }
+        }
+        return false;
+    }
+
     protected List<Function<Vector3f, Float>> chooseAxes(List<Vector3f> vertices) {
         float minX = Float.MAX_VALUE;
         float maxX = -Float.MAX_VALUE;
@@ -132,7 +187,7 @@ public class EarCuttingTriangulator implements Triangulator {
 
         List<Pair<Float, Function<Vector3f, Float>>> pairs = new ArrayList<>(List.of(dxPair, dyPair, dzPair));
         pairs.sort((t1, t2) -> Float.compare(t1.first, t2.first));
-        return List.of(pairs.get(2).second, pairs.get(1).second);
+        return List.of(pairs.get(2).second, pairs.get(1).second, pairs.get(0).second);
     }
 
     /**
@@ -140,21 +195,22 @@ public class EarCuttingTriangulator implements Triangulator {
      * @param vertices - список вершин полигона в определенном порядке (по или против часовой)
      * @return ByPassDirection направление задания вершин конкретного полигона
      */
-    public ByPassDirection findDirection(List<Vector3f> vertices) {
-        int indexOfBottomLeftVertex = 0;
+    public ByPassDirection findDirection(List<Vector3f> vertices, Function<Vector3f, Float> getterFirst,
+                                         Function<Vector3f, Float> getterSecond) {
+        int indexOfFoundingVertex = 0;
         Vector3f bottomLeftVertex = vertices.get(0);
         for (int i = 1; i < vertices.size(); i++) {
             Vector3f currentVertex = vertices.get(i);
-            if (currentVertex.getY() <= bottomLeftVertex.getY()) {
-                if (currentVertex.getY() == bottomLeftVertex.getY() && currentVertex.getX() > bottomLeftVertex.getX())
+            if (getterFirst.apply(currentVertex) <= getterFirst.apply(bottomLeftVertex)) {
+                if (Objects.equals(getterFirst.apply(currentVertex), getterFirst.apply(bottomLeftVertex)) && getterSecond.apply(currentVertex) > getterSecond.apply(bottomLeftVertex))
                     continue;
-                indexOfBottomLeftVertex = i;
+                indexOfFoundingVertex = i;
                 bottomLeftVertex = currentVertex;
             }
         }
 
-        int leftVertexIndex = indexOfBottomLeftVertex - 1 < 0 ? vertices.size() - 1 : indexOfBottomLeftVertex - 1;
-        int rightVertexIndex = indexOfBottomLeftVertex + 1 >= vertices.size() ? 0 : indexOfBottomLeftVertex + 1;
+        int leftVertexIndex = indexOfFoundingVertex - 1 < 0 ? vertices.size() - 1 : indexOfFoundingVertex - 1;
+        int rightVertexIndex = indexOfFoundingVertex + 1 >= vertices.size() ? 0 : indexOfFoundingVertex + 1;
         Vector3f vectorA = new Vector3f(
                 vertices.get(leftVertexIndex).getX() - bottomLeftVertex.getX(),
                 vertices.get(leftVertexIndex).getY() - bottomLeftVertex.getY(),
@@ -166,7 +222,7 @@ public class EarCuttingTriangulator implements Triangulator {
                 vertices.get(rightVertexIndex).getY() - bottomLeftVertex.getY(),
                 vertices.get(rightVertexIndex).getZ() - bottomLeftVertex.getZ()
         );
-        return vectorA.getX() * vectorB.getY() - vectorA.getY() * vectorB.getX() > 0 ?
-                ByPassDirection.REVERSE : ByPassDirection.CLOCKWISE;
+        return getterFirst.apply(vectorA) * getterSecond.apply(vectorB) - getterSecond.apply(vectorA) * getterFirst.apply(vectorB) > 0 ?
+                ByPassDirection.SECOND : ByPassDirection.FIRST;
     }
 }

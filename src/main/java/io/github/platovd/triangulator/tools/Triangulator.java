@@ -7,7 +7,6 @@ import io.github.platovd.triangulator.model.TriangulatedModel;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 public interface Triangulator {
     /**

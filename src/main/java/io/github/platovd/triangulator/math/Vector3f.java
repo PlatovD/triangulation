@@ -27,4 +27,13 @@ public class Vector3f {
     public float getZ() {
         return z;
     }
+
+    @Override
+    public String toString() {
+        return "Vector3f{" +
+                "x=" + x +
+                ", y=" + y +
+                ", z=" + z +
+                '}';
+    }
 }
