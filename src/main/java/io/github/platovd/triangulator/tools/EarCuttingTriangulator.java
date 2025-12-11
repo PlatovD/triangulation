@@ -45,7 +45,10 @@ public class EarCuttingTriangulator implements Triangulator {
         // Подготовка. Подбираю оси, по которым буду триангулировать
         List<Function<Vector3f, Float>> axes = chooseAxes(verticesList);
         // если невозможно триангулировать
-        if (axes == null) return List.of(PolygonUtils.deepCopyOfPolygon(polygon));
+        if (axes == null) {
+            System.err.println("Unenviable triangulate polygon");
+            return List.of(PolygonUtils.deepCopyOfPolygon(polygon));
+        }
         ByPassDirection polygonDirection = findDirection(verticesList, axes.get(0), axes.get(1));
         List<Polygon> newPolygons = new ArrayList<>();
         int leftPointIndex = verticesIndexes.poll();
@@ -92,6 +95,7 @@ public class EarCuttingTriangulator implements Triangulator {
      * @param vertices список вершин на проверку
      * @return true, если одна из вершин в треугольнике, иначе false
      */
+    @Deprecated
     protected boolean isVerticesInsideTriangle(int leftPointIndex, int rightPointIndex, int middlePointIndex, Map<Integer, Vector3f> vertices) {
         Triangle triangle =
                 new Triangle(vertices.get(leftPointIndex), vertices.get(rightPointIndex), vertices.get(middlePointIndex));
@@ -117,6 +121,7 @@ public class EarCuttingTriangulator implements Triangulator {
                 getterFirst.apply(vertices.get(rightPointIndex)),
                 getterSecond.apply(vertices.get(rightPointIndex))
         );
+        if (abs(mainS) < Constants.EPS) return false;
         for (int i : vertices.keySet()) {
             if (i != leftPointIndex && i != rightPointIndex && i != middlePointIndex) {
                 float leftMidS = (float) MathUtil.calcSquareByGeroneByVertices(
@@ -164,29 +169,73 @@ public class EarCuttingTriangulator implements Triangulator {
         float minZ = Float.MAX_VALUE;
         float maxZ = -Float.MAX_VALUE;
 
+        TreeSet<Float> xCoordsOfPolygonVertices = new TreeSet<>();
+        TreeSet<Float> yCoordsOfPolygonVertices = new TreeSet<>();
+        TreeSet<Float> zCoordsOfPolygonVertices = new TreeSet<>();
+
+        boolean wasCoincidenceX = false;
+        boolean wasCoincidenceY = false;
+        boolean wasCoincidenceZ = false;
+
         for (Vector3f vertex : vertices) {
-            minX = min(vertex.getX(), minX);
-            maxX = max(vertex.getX(), maxX);
+            float currentX = vertex.getX();
+            if (!wasCoincidenceX) {
+                Float left = xCoordsOfPolygonVertices.lower(currentX);
+                Float right = xCoordsOfPolygonVertices.ceiling(currentX);
+                if (left != null) wasCoincidenceX = Constants.EPS >= abs(currentX - left);
+                if (right != null) wasCoincidenceX = Constants.EPS >= abs(currentX - right);
+                xCoordsOfPolygonVertices.add(currentX);
+            }
+            minX = min(currentX, minX);
+            maxX = max(currentX, maxX);
 
-            minY = min(vertex.getY(), minY);
-            maxY = max(vertex.getY(), maxY);
+            float currentY = vertex.getY();
+            if (!wasCoincidenceY) {
+                Float left = yCoordsOfPolygonVertices.lower(currentY);
+                Float right = yCoordsOfPolygonVertices.ceiling(currentY);
+                if (left != null) wasCoincidenceY = Constants.EPS >= abs(currentY - left);
+                if (right != null) wasCoincidenceY = Constants.EPS >= abs(currentY - right);
+                yCoordsOfPolygonVertices.add(currentY);
+            }
+            minY = min(currentY, minY);
+            maxY = max(currentY, maxY);
 
-            minZ = min(vertex.getZ(), minZ);
-            maxZ = max(vertex.getZ(), maxZ);
+            float currentZ = vertex.getZ();
+            if (!wasCoincidenceZ) {
+                Float left = zCoordsOfPolygonVertices.lower(currentZ);
+                Float right = zCoordsOfPolygonVertices.ceiling(currentZ);
+                if (left != null) wasCoincidenceZ = Constants.EPS >= abs(currentZ - left);
+                if (right != null) wasCoincidenceZ = Constants.EPS >= abs(currentZ - right);
+                zCoordsOfPolygonVertices.add(currentZ);
+            }
+            minZ = min(currentZ, minZ);
+            maxZ = max(currentZ, maxZ);
         }
+
 
         float dx = maxX - minX;
         float dy = maxY - minY;
         float dz = maxZ - minZ;
 
-        if (dx < Constants.EPS && dy < Constants.EPS && dz < Constants.EPS) return null;
+        float maxDiff = Math.max(dx, Math.max(dy, dz));
+        float minDiff = Math.min(dx, Math.min(dy, dz));
+        Pair<Integer, Function<Vector3f, Float>> dxPair = new Pair<>(
+                (dx <= Constants.EPS ? -100 : 0) + (wasCoincidenceX ? -100 : 0) + (dx == maxDiff ? 2 : dx == minDiff ? 0 : 1),
+                Vector3f::getX);
+        Pair<Integer, Function<Vector3f, Float>> dyPair = new Pair<>(
+                (dy <= Constants.EPS ? -100 : 0) + (wasCoincidenceY ? -100 : 0) + (dy == maxDiff ? 2 : dy == minDiff ? 0 : 1),
+                Vector3f::getY);
+        Pair<Integer, Function<Vector3f, Float>> dzPair = new Pair<>(
+                (dz <= Constants.EPS ? -100 : 0) + (wasCoincidenceZ ? -100 : 0) + (dz == maxDiff ? 2 : dz == minDiff ? 0 : 1),
+                Vector3f::getZ);
 
-        Pair<Float, Function<Vector3f, Float>> dxPair = new Pair<>(dx, Vector3f::getX);
-        Pair<Float, Function<Vector3f, Float>> dyPair = new Pair<>(dy, Vector3f::getY);
-        Pair<Float, Function<Vector3f, Float>> dzPair = new Pair<>(dz, Vector3f::getZ);
-
-        List<Pair<Float, Function<Vector3f, Float>>> pairs = new ArrayList<>(List.of(dxPair, dyPair, dzPair));
-        pairs.sort((t1, t2) -> Float.compare(t1.first, t2.first));
+        List<Pair<Integer, Function<Vector3f, Float>>> pairs = new ArrayList<>(List.of(dxPair, dyPair, dzPair));
+        int negativeCnt = 0;
+        for (
+                var pair : pairs)
+            negativeCnt += pair.first < 0 ? 1 : 0;
+        if (negativeCnt > 2) return null;
+        pairs.sort(Comparator.comparingInt(t -> t.first));
         return List.of(pairs.get(2).second, pairs.get(1).second, pairs.get(0).second);
     }
 
