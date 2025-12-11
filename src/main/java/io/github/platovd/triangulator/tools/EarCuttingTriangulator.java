@@ -169,74 +169,61 @@ public class EarCuttingTriangulator implements Triangulator {
         float minZ = Float.MAX_VALUE;
         float maxZ = -Float.MAX_VALUE;
 
-        TreeSet<Float> xCoordsOfPolygonVertices = new TreeSet<>();
-        TreeSet<Float> yCoordsOfPolygonVertices = new TreeSet<>();
-        TreeSet<Float> zCoordsOfPolygonVertices = new TreeSet<>();
+        boolean XYbad = false;
+        boolean XZbad = false;
+        boolean YZbad = false;
 
-        boolean wasCoincidenceX = false;
-        boolean wasCoincidenceY = false;
-        boolean wasCoincidenceZ = false;
-
-        for (Vector3f vertex : vertices) {
-            float currentX = vertex.getX();
-            if (!wasCoincidenceX) {
-                Float left = xCoordsOfPolygonVertices.lower(currentX);
-                Float right = xCoordsOfPolygonVertices.ceiling(currentX);
-                if (left != null) wasCoincidenceX = Constants.EPS >= abs(currentX - left);
-                if (right != null) wasCoincidenceX = Constants.EPS >= abs(currentX - right);
-                xCoordsOfPolygonVertices.add(currentX);
+        for (int i = 0; i < vertices.size() - 1; i++) {
+            Vector3f v1 = vertices.get(i);
+            maxX = max(maxX, v1.getX());
+            maxY = max(maxY, v1.getY());
+            maxZ = max(maxZ, v1.getZ());
+            minX = min(minX, v1.getX());
+            minY = min(minY, v1.getY());
+            minZ = min(minZ, v1.getZ());
+            for (int j = i + 1; j < vertices.size(); j++) {
+                Vector3f v2 = vertices.get(j);
+                if (
+                        abs(v1.getX() - v2.getX()) <= Constants.EPS
+                                && abs(v1.getY() - v2.getY()) <= Constants.EPS
+                                && abs(v1.getZ() - v2.getZ()) <= Constants.EPS
+                ) {
+                    return null;
+                }
+                if (abs(v1.getX() - v2.getX()) <= Constants.EPS
+                        && abs(v1.getY() - v2.getY()) <= Constants.EPS) {
+                    XYbad = true;
+                }
+                if (abs(v1.getX() - v2.getX()) <= Constants.EPS
+                        && abs(v1.getZ() - v2.getZ()) <= Constants.EPS) {
+                    XZbad = true;
+                }
+                if (abs(v1.getY() - v2.getY()) <= Constants.EPS
+                        && abs(v1.getZ() - v2.getZ()) <= Constants.EPS) {
+                    YZbad = true;
+                }
             }
-            minX = min(currentX, minX);
-            maxX = max(currentX, maxX);
-
-            float currentY = vertex.getY();
-            if (!wasCoincidenceY) {
-                Float left = yCoordsOfPolygonVertices.lower(currentY);
-                Float right = yCoordsOfPolygonVertices.ceiling(currentY);
-                if (left != null) wasCoincidenceY = Constants.EPS >= abs(currentY - left);
-                if (right != null) wasCoincidenceY = Constants.EPS >= abs(currentY - right);
-                yCoordsOfPolygonVertices.add(currentY);
-            }
-            minY = min(currentY, minY);
-            maxY = max(currentY, maxY);
-
-            float currentZ = vertex.getZ();
-            if (!wasCoincidenceZ) {
-                Float left = zCoordsOfPolygonVertices.lower(currentZ);
-                Float right = zCoordsOfPolygonVertices.ceiling(currentZ);
-                if (left != null) wasCoincidenceZ = Constants.EPS >= abs(currentZ - left);
-                if (right != null) wasCoincidenceZ = Constants.EPS >= abs(currentZ - right);
-                zCoordsOfPolygonVertices.add(currentZ);
-            }
-            minZ = min(currentZ, minZ);
-            maxZ = max(currentZ, maxZ);
         }
 
+        if (XYbad && XZbad && YZbad) return null;
 
         float dx = maxX - minX;
         float dy = maxY - minY;
         float dz = maxZ - minZ;
 
-        float maxDiff = Math.max(dx, Math.max(dy, dz));
-        float minDiff = Math.min(dx, Math.min(dy, dz));
-        Pair<Integer, Function<Vector3f, Float>> dxPair = new Pair<>(
-                (dx <= Constants.EPS ? -100 : 0) + (wasCoincidenceX ? -100 : 0) + (dx == maxDiff ? 2 : dx == minDiff ? 0 : 1),
-                Vector3f::getX);
-        Pair<Integer, Function<Vector3f, Float>> dyPair = new Pair<>(
-                (dy <= Constants.EPS ? -100 : 0) + (wasCoincidenceY ? -100 : 0) + (dy == maxDiff ? 2 : dy == minDiff ? 0 : 1),
-                Vector3f::getY);
-        Pair<Integer, Function<Vector3f, Float>> dzPair = new Pair<>(
-                (dz <= Constants.EPS ? -100 : 0) + (wasCoincidenceZ ? -100 : 0) + (dz == maxDiff ? 2 : dz == minDiff ? 0 : 1),
-                Vector3f::getZ);
+        if (dx <= Constants.EPS && dy <= Constants.EPS) return null;
+        if (dy <= Constants.EPS && dz <= Constants.EPS) return null;
+        if (dx <= Constants.EPS && dz <= Constants.EPS) return null;
 
-        List<Pair<Integer, Function<Vector3f, Float>>> pairs = new ArrayList<>(List.of(dxPair, dyPair, dzPair));
-        int negativeCnt = 0;
-        for (
-                var pair : pairs)
-            negativeCnt += pair.first < 0 ? 1 : 0;
-        if (negativeCnt > 2) return null;
-        pairs.sort(Comparator.comparingInt(t -> t.first));
-        return List.of(pairs.get(2).second, pairs.get(1).second, pairs.get(0).second);
+        Function<Vector3f, Float> dxGetter = Vector3f::getX;
+        Function<Vector3f, Float> dyGetter = Vector3f::getY;
+        Function<Vector3f, Float> dzGetter = Vector3f::getZ;
+
+        if (dx > Constants.EPS && dy > Constants.EPS && !XYbad)
+            return List.of(dxGetter, dyGetter);
+        if (dx > Constants.EPS && dz > Constants.EPS && !XZbad)
+            return List.of(dxGetter, dzGetter);
+        return List.of(dyGetter, dzGetter);
     }
 
     /**
