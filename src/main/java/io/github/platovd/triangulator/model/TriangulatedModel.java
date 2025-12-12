@@ -17,4 +17,12 @@ public class TriangulatedModel extends Model {
         }
         return triangles;
     }
+
+    boolean isValid() {
+        for (Polygon polygon : polygons) {
+            if (polygon.getVertexIndices().size() > 3)
+                return false;
+        }
+        return true;
+    }
 }

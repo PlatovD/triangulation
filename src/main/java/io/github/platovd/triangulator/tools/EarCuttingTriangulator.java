@@ -7,8 +7,7 @@ import io.github.platovd.triangulator.model.Polygon;
 import io.github.platovd.triangulator.model.Triangle;
 import io.github.platovd.triangulator.util.ByPassDirection;
 import io.github.platovd.triangulator.util.Constants;
-import io.github.platovd.triangulator.util.Pair;
-import io.github.platovd.triangulator.util.PolygonUtils;
+import io.github.platovd.triangulator.util.PolygonUtil;
 
 import java.util.*;
 import java.util.function.Function;
@@ -20,7 +19,7 @@ public class EarCuttingTriangulator implements Triangulator {
     public List<Polygon> triangulatePolygon(Model model, Polygon polygon) {
         // когда 3 и менее вершины изначально. Возвращаю deep копию полигона
         if (polygon.getVertexIndices().size() < 4) {
-            return List.of(PolygonUtils.deepCopyOfPolygon(polygon));
+            return List.of(PolygonUtil.deepCopyOfPolygon(polygon));
         }
 
         // получаю данные из оригинального объекта
@@ -47,7 +46,7 @@ public class EarCuttingTriangulator implements Triangulator {
         // если невозможно триангулировать
         if (axes == null) {
             System.err.println("Unenviable triangulate polygon");
-            return List.of(PolygonUtils.deepCopyOfPolygon(polygon));
+            return List.of(PolygonUtil.deepCopyOfPolygon(polygon));
         }
         ByPassDirection polygonDirection = findDirection(verticesList, axes.get(0), axes.get(1));
         List<Polygon> newPolygons = new ArrayList<>();
@@ -75,7 +74,7 @@ public class EarCuttingTriangulator implements Triangulator {
                 rightPointIndex = verticesIndexes.poll();
                 continue;
             }
-            newPolygons.add(PolygonUtils.createNewPolygon(
+            newPolygons.add(PolygonUtil.createNewPolygon(
                     List.of(leftPointIndex, middlePointIndex, rightPointIndex),
                     textureIndexesMap,
                     normalsIndexesMap

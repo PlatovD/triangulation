@@ -8,13 +8,14 @@ import io.github.platovd.triangulator.model.TriangulatedModel;
 import java.util.ArrayList;
 import java.util.List;
 
+
 public interface Triangulator {
     /**
      * Триангулирует переданную модель
      * @param model - пользовательская модель
      */
     default void triangulateModel(Model model) {
-        ArrayList<Polygon> newPolygons = new ArrayList<>(model.vertices.size() - 2);
+        ArrayList<Polygon> newPolygons = new ArrayList<>(Math.max(model.vertices.size() - 2, 0));
         for (Polygon polygon : model.polygons) {
             List<Polygon> clipped = triangulatePolygon(model, polygon);
             newPolygons.addAll(clipped);

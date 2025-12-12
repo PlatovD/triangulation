@@ -3,7 +3,7 @@ package io.github.platovd.triangulator.tools;
 
 import io.github.platovd.triangulator.model.Model;
 import io.github.platovd.triangulator.model.Polygon;
-import io.github.platovd.triangulator.util.PolygonUtils;
+import io.github.platovd.triangulator.util.PolygonUtil;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -33,7 +33,7 @@ public class SimpleTriangulator implements Triangulator {
         int secondVertexIndex = 1;
         int thirdVertexIndex = 2;
         while (thirdVertexIndex < n) {
-            Polygon newPolygon = PolygonUtils.createNewPolygon(List.of(
+            Polygon newPolygon = PolygonUtil.createNewPolygon(List.of(
                     verticesIndexes.get(firstVertexIndex),
                     verticesIndexes.get(secondVertexIndex),
                     verticesIndexes.get(thirdVertexIndex)
