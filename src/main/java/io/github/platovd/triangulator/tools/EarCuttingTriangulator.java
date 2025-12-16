@@ -30,15 +30,13 @@ public class EarCuttingTriangulator implements Triangulator {
         Map<Integer, Integer> normalsIndexesMap = new HashMap<>();
         // вспомогательный список вершин, хранимый для определения направления задания полигона
         List<Vector3f> verticesList = new ArrayList<>();
-        int indexOfVertexInPolygon = 0;
         for (Integer vertexIndex : verticesIndexes) {
             vertices.put(vertexIndex, model.vertices.get(vertexIndex));
             if (vertexIndex < polygon.getTextureVertexIndices().size())
-                textureIndexesMap.put(vertexIndex, polygon.getTextureVertexIndices().get(indexOfVertexInPolygon));
+                textureIndexesMap.put(vertexIndex, polygon.getTextureVertexIndices().get(vertexIndex));
             if (vertexIndex < polygon.getNormalIndices().size())
-                normalsIndexesMap.put(vertexIndex, polygon.getNormalIndices().get(indexOfVertexInPolygon));
+                normalsIndexesMap.put(vertexIndex, polygon.getNormalIndices().get(vertexIndex));
             verticesList.add(model.vertices.get(vertexIndex));
-            indexOfVertexInPolygon++;
         }
 
         // Подготовка. Подбираю оси, по которым буду триангулировать
