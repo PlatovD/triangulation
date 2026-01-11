@@ -15,8 +15,11 @@ import java.util.function.Function;
 import static java.lang.Math.*;
 
 public class EarCuttingTriangulator implements Triangulator {
+    private final static int MAX_LOOP_SIZE = 1000000;
+
     @Override
     public List<Polygon> triangulatePolygon(Model model, Polygon polygon) {
+        float[] barycentric = new float[3];
         // когда 3 и менее вершины изначально. Возвращаю deep копию полигона
         if (polygon.getVertexIndices().size() < 4) {
             return List.of(PolygonUtil.deepCopyOfPolygon(polygon));
@@ -51,12 +54,13 @@ public class EarCuttingTriangulator implements Triangulator {
         int leftPointIndex = verticesIndexes.poll();
         int middlePointIndex = verticesIndexes.poll();
         int rightPointIndex = verticesIndexes.poll();
+        int iterationsCount = 0;
         while (!verticesIndexes.isEmpty()) {
             // есть два условия, когда я не могу отрезать ухо:
             // 1)одна из оставшихся вершин в треугольнике
             // 2)направления обхода полигона и текущего треугольника не совпадают
             if (
-                    isVerticesInsideTriangleByGeroneSquare(leftPointIndex, middlePointIndex, rightPointIndex, vertices,
+                    isAnyVertexInsideTriangleByBarycentric(barycentric, leftPointIndex, middlePointIndex, rightPointIndex, vertices,
                             axes.get(0), axes.get(1))
                             || findDirection(
                             List.of(
@@ -70,6 +74,9 @@ public class EarCuttingTriangulator implements Triangulator {
                 leftPointIndex = middlePointIndex;
                 middlePointIndex = rightPointIndex;
                 rightPointIndex = verticesIndexes.poll();
+                iterationsCount++;
+                if (iterationsCount > MAX_LOOP_SIZE)
+                    throw new RuntimeException("Bad polygons model. Unable to triangulate. Try SimpleTriangulator");
                 continue;
             }
             newPolygons.add(PolygonUtil.createNewPolygon(
@@ -79,6 +86,7 @@ public class EarCuttingTriangulator implements Triangulator {
             ));
             middlePointIndex = rightPointIndex;
             rightPointIndex = verticesIndexes.poll();
+            iterationsCount = 0;
         }
         newPolygons.add(new Polygon(List.of(leftPointIndex, middlePointIndex, rightPointIndex)));
         return newPolygons;
@@ -104,6 +112,40 @@ public class EarCuttingTriangulator implements Triangulator {
         return false;
     }
 
+    protected boolean isAnyVertexInsideTriangleByBarycentric(
+            float[] barycentric,
+            int leftPointIndex, int rightPointIndex, int middlePointIndex, Map<Integer, Vector3f> vertices,
+            Function<Vector3f, Float> getterFirst, Function<Vector3f, Float> getterSecond
+    ) {
+        for (int i : vertices.keySet()) {
+            if (i == leftPointIndex || i == rightPointIndex || i == middlePointIndex) continue;
+            float point0cord0 = getterFirst.apply(vertices.get(leftPointIndex));
+            float point0cord1 = getterSecond.apply(vertices.get(leftPointIndex));
+
+            float point1cord0 = getterFirst.apply(vertices.get(middlePointIndex));
+            float point1cord1 = getterSecond.apply(vertices.get(middlePointIndex));
+
+            float point2cord0 = getterFirst.apply(vertices.get(rightPointIndex));
+            float point2cord1 = getterSecond.apply(vertices.get(rightPointIndex));
+
+            float pointCurrentCord0 = getterFirst.apply(vertices.get(i));
+            float pointCurrentCord1 = getterSecond.apply(vertices.get(i));
+
+            findBarycentricCords(
+                    barycentric, pointCurrentCord0, pointCurrentCord1,
+                    point0cord0, point0cord1,
+                    point1cord0, point1cord1,
+                    point2cord0, point2cord1
+            );
+
+            if (barycentric[0] < 0 || barycentric[1] < 0 || barycentric[2] < 0) continue;
+            if (abs(1 - barycentric[0] + barycentric[1] + barycentric[2]) > Constants.EPS) continue;
+            return true;
+        }
+        return false;
+    }
+
+    @Deprecated
     protected boolean isVerticesInsideTriangleByGeroneSquare(
             int leftPointIndex, int rightPointIndex, int middlePointIndex, Map<Integer, Vector3f> vertices,
             Function<Vector3f, Float> getterFirst, Function<Vector3f, Float> getterSecond
@@ -255,7 +297,50 @@ public class EarCuttingTriangulator implements Triangulator {
                 vertices.get(rightVertexIndex).getY() - bottomLeftVertex.getY(),
                 vertices.get(rightVertexIndex).getZ() - bottomLeftVertex.getZ()
         );
-        return getterFirst.apply(vectorA) * getterSecond.apply(vectorB) - getterSecond.apply(vectorA) * getterFirst.apply(vectorB) > 0 ?
+
+        float cross = getterFirst.apply(vectorA) * getterSecond.apply(vectorB) - getterSecond.apply(vectorA) * getterFirst.apply(vectorB);
+        return cross > 0 ?
                 ByPassDirection.SECOND : ByPassDirection.FIRST;
+    }
+
+    public static void findBarycentricCords(float[] barycentric, float xCur, float yCur, float x0, float y0, float x1, float y1, float x2, float y2) {
+        float mainDet = findThirdOrderDeterminant(
+                x0, x1, x2,
+                y0, y1, y2,
+                1, 1, 1
+        );
+        if (mainDet == 0) {
+            barycentric[0] = 0;
+            barycentric[1] = 0;
+            barycentric[2] = 0;
+            return;
+        }
+
+        float detForAlpha = findThirdOrderDeterminant(
+                xCur, x1, x2,
+                yCur, y1, y2,
+                1, 1, 1
+        );
+        float detForBeta = findThirdOrderDeterminant(
+                x0, xCur, x2,
+                y0, yCur, y2,
+                1, 1, 1
+        );
+        float detForLambda = findThirdOrderDeterminant(
+                x0, x1, xCur,
+                y0, y1, yCur,
+                1, 1, 1
+        );
+        barycentric[0] = detForAlpha / mainDet;
+        barycentric[1] = detForBeta / mainDet;
+        barycentric[2] = detForLambda / mainDet;
+    }
+
+    public static float findThirdOrderDeterminant(
+            float a00, float a01, float a02,
+            float a10, float a11, float a12,
+            float a20, float a21, float a22
+    ) {
+        return ((a00 * a11 * a22) + (a10 * a21 * a02) + (a01 * a12 * a20)) - ((a02 * a11 * a20) + (a01 * a10 * a22) + (a12 * a21 * a00));
     }
 }
