@@ -25,6 +25,7 @@ public class EarCuttingTriangulator implements Triangulator {
             return List.of(PolygonUtil.deepCopyOfPolygon(polygon));
         }
 
+        int indexOfVertexInPolygon = 0;
         // получаю данные из оригинального объекта
         Queue<Integer> verticesIndexes = new LinkedList<>(polygon.getVertexIndices());
         // создаю ассоциативные коллекции, которые связывают индексы, используемые в полигонах с объектами меша
@@ -35,11 +36,12 @@ public class EarCuttingTriangulator implements Triangulator {
         List<Vector3f> verticesList = new ArrayList<>();
         for (Integer vertexIndex : verticesIndexes) {
             vertices.put(vertexIndex, model.vertices.get(vertexIndex));
-            if (vertexIndex < polygon.getTextureVertexIndices().size())
-                textureIndexesMap.put(vertexIndex, polygon.getTextureVertexIndices().get(vertexIndex));
-            if (vertexIndex < polygon.getNormalIndices().size())
-                normalsIndexesMap.put(vertexIndex, polygon.getNormalIndices().get(vertexIndex));
+            if (indexOfVertexInPolygon < polygon.getTextureVertexIndices().size())
+                textureIndexesMap.put(vertexIndex, polygon.getTextureVertexIndices().get(indexOfVertexInPolygon));
+            if (indexOfVertexInPolygon < polygon.getNormalIndices().size())
+                normalsIndexesMap.put(vertexIndex, polygon.getNormalIndices().get(indexOfVertexInPolygon));
             verticesList.add(model.vertices.get(vertexIndex));
+            indexOfVertexInPolygon++;
         }
 
         // Подготовка. Подбираю оси, по которым буду триангулировать
@@ -88,7 +90,7 @@ public class EarCuttingTriangulator implements Triangulator {
             rightPointIndex = verticesIndexes.poll();
             iterationsCount = 0;
         }
-        newPolygons.add(new Polygon(List.of(leftPointIndex, middlePointIndex, rightPointIndex)));
+        newPolygons.add(PolygonUtil.createNewPolygon(List.of(leftPointIndex, middlePointIndex, rightPointIndex), textureIndexesMap, normalsIndexesMap));
         return newPolygons;
     }
 
